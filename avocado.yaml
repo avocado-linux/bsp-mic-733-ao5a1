@@ -11,7 +11,8 @@ extensions:
       Layered carrier support for the Advantech MIC-733-AO5A1 industrial
       gateway — the 32GB SOM variant (P3701-0000) of the same MIC-733-AO
       carrier the AO6A1 ships on (Jetson AGX Orin SOM, Advantech carrier
-      with 4× MGBE / mini-PCIe / M.2 / discrete DI/DO / RS-232/422/485).
+      with 4× 10GbE (two Intel X550 dual-port NICs on PCIe C7/C8) /
+      mini-PCIe / M.2 / discrete DI/DO / RS-232/422/485).
       Carrier hardware is identical to the AO6A1; only the AGX Orin
       module capacity differs (32GB / sku 0000 on AO5A1, 64GB / sku 0005
       on AO6A1), which the jetson-agx-orin-devkit.conf flash flow
@@ -24,12 +25,19 @@ extensions:
       explicit vs. the stock NVIDIA filenames the MACHINE bakes. The
       sku-driven file uses the 0000 variant the conf selects for 32GB:
         * tegra234-p3737-0000+p3701-0000-nv-adv.dtb (kernel DTB) —
-          carrier I/O nodes. pcie@141e0000 (C8) flipped to disabled —
-          the vendor DTB declares C8's 8 phys against `p2u_gbe_*` lanes
-          (GBE UPHY, which MB1 explicitly skips on this board:
-          `W> Skipping GBE UPHY config`). Walking those phys at boot
-          reads unpowered register blocks and tripped a fatal RAS UE
-          in BL31 at ADDR=0x3f600c0. The carrier doesn't expose C8.
+          byte-identical to the Advantech-flashed vendor DTB. The
+          carrier's four 10GbE ports are two Intel X550 dual-port NICs
+          (8086:1563) on PCIe controllers C7 (pcie@141a0000) and C8
+          (pcie@141e0000), both x8; `ixgbe` drives all four. (The on-SoC
+          MGBE/EQOS are unused — factory runtime DT and lsmod confirm
+          they stay disabled.) C8's PHYs are GBE-UPHY lanes, so it only
+          comes up when MB1 routes the GBE UPHY to PCIe via the factory
+          ODMDATA (gbe-uphy-config-0 / hsio-uphy-config-16, set as
+          CARRIER_ENV_ODMDATA in carrier.env). Without that ODMDATA the
+          GBE UPHY is left unpowered (`W> Skipping GBE UPHY config`) and
+          probing C8 trips a fatal RAS UE at p2u_gbe_4 (0x3f600c0) — the
+          reason an earlier revision disabled C8 and lost X550 #2 (ports
+          3 & 4). With the ODMDATA override in place, C8 is left enabled.
       The BPMP DTB is the unmodified upstream
       tegra234-bpmp-3701-0000-3737-0000.dtb (selected by p3701.conf.common
       for board_sku 0000); no carrier override.
@@ -85,7 +93,7 @@ extensions:
     # which is the canonical AGX Orin SOM module set. Carrier-specific
     # adjustments below: drop DevKit's onboard Realtek 1GbE bits
     # (RTL8211F PHY / r8169 MAC / linux-firmware-rtl8168) and add
-    # kernel-module-ixgbe for the riser X550 dual-port 10GbE.
+    # kernel-module-ixgbe for the two X550 dual-port 10GbE NICs (C7/C8).
     packages:
       kernel-module-at24: '*'
       kernel-module-cec: '*'
@@ -100,12 +108,14 @@ extensions:
       kernel-module-mc-hwpm: '*'
       kernel-module-mc-utils: '*'
       # Ethernet
-      # - nvethernet: NVIDIA OOT MGBE driver for the 4× on-SoC MGBE ports
-      #   wired through the carrier (resolved via nv-kernel-module-nvethernet
-      #   `Provides: kernel-module-nvethernet`).
-      # - ixgbe: in-tree Intel driver for the X550 dual-port 10GbE on the
-      #   PCIe riser card (CONFIG_IXGBE=m in avocado-extra.cfg).
-      # - stmmac: alt-kernel (5.15) MAC path; harmless on 6.6.
+      # - ixgbe: in-tree Intel driver for the carrier's two X550 dual-port
+      #   10GbE NICs (8086:1563) on PCIe C7 (141a0000) and C8 (141e0000) —
+      #   all four front 10GbE ports. C8 requires the GBE-UPHY ODMDATA
+      #   override (CARRIER_ENV_ODMDATA in carrier.env); see the DTB note in
+      #   the description above. (CONFIG_IXGBE=m in avocado-extra.cfg.)
+      # - nvethernet/stmmac: on-SoC MGBE/EQOS drivers. The carrier does NOT
+      #   wire out the on-SoC MACs (factory leaves them disabled), so these
+      #   never bind; kept only for parity with the SOM module set.
       kernel-module-nvethernet: '*'
       kernel-module-ixgbe: '*'
       kernel-module-stmmac: '*'
