@@ -12,8 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2024 feed but not in 2026, so the 2026 leg landed in an orphan
   `jetson-agx-orin-devkit-ext` repo that no 2026 device resolves, and
   `2026/next/target/jetson-agx-orin-ext` carried no carrier support at all.
-  The 2026 leg now names `jetson-agx-orin`; the 2024 leg keeps
-  `jetson-agx-orin-devkit` until the scarthgap rename reaches that feed.
+  The 2026 leg now names `jetson-agx-orin`.
 
 ### Added
 - `test.yml` gains the 2026 leg, so the combination that was broken is the one
@@ -32,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep their display behavior.
 
 ### Changed
+- The 2024 feed now uses the target name `jetson-agx-orin`, as the 2026 feed
+  does: meta-avocado scarthgap renamed `jetson-agx-orin-devkit` to
+  `jetson-agx-orin`. `supported_targets` lists the one name, and CI builds and
+  releases it for both feeds. A 2024 project must set
+  `default_target: jetson-agx-orin`.
 - The 2026 package set resolves on both 2026 kernels (6.18.35 and
   6.8.12-l4t-r39.2.0): the `nv-kernel-module-snd-soc-*` packages are now
   `kernel-module-snd-soc-*`, and `tegra-nvphs`, `tegra-nvstartup` and
